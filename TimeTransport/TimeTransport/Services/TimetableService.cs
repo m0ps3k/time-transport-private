@@ -1,6 +1,8 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Data.Common;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -16,13 +18,6 @@ namespace TimeTransport.Services;
 
 public class TimetableService
 {
-    // private static Timetable _data;
-
-    // public TimetableService(Timetable data)
-    // {
-    //     _data = data;
-    // }
-
     public async Task<Timetable> LoadAsync()
     {
         var assembly = Assembly.GetExecutingAssembly();
@@ -31,12 +26,6 @@ public class TimetableService
         var data = await JsonSerializer.DeserializeAsync<Timetable>(stream, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
         return data;
     }
-
-    // public async Task CreateAsync()
-    // {
-    //     var timetable = await LoadAsync();
-    //     _data = timetable;
-    // }
 
     public async Task<List<List<DisplayType>>> GetCurrentTimetableAsync(Timetable timetable, string stop, bool DirectionIsBackward)
     {
@@ -52,6 +41,10 @@ public class TimetableService
 
         string stopId = stopsDic[stop];
         Dictionary<string, Dictionary<string, List<string>>> stopSchedule = new(); //Номер маршрута, Словарь: Часы: Лист из минут
+        DayOfWeek logical = DateTime.Now.AddHours(-3).DayOfWeek;
+        bool isWeekday = logical != DayOfWeek.Saturday && logical != DayOfWeek.Sunday;
+
+
         if (stopId == "utkina_zavod")
         {
             foreach (var route in timetable.Routes)
@@ -61,7 +54,7 @@ public class TimetableService
                 {
                     if (stopItem.Id == stopId)
                     {
-                        if (DateTime.Now.DayOfWeek != DayOfWeek.Saturday && DateTime.Now.DayOfWeek != DayOfWeek.Sunday)
+                        if (isWeekday)
                         {
                             stopSchedule.Add(route.Number, stopItem.Schedule.Weekday);
                         }
@@ -82,7 +75,7 @@ public class TimetableService
                 {
                     if (stopItem.Id == stopId)
                     {
-                        if (DateTime.Now.DayOfWeek != DayOfWeek.Saturday && DateTime.Now.DayOfWeek != DayOfWeek.Sunday)
+                        if (isWeekday)
                         {
                             stopSchedule.Add(route.Number, stopItem.Schedule.Weekday);
                         }
@@ -97,10 +90,6 @@ public class TimetableService
 
         List<List<DisplayType>> finalSchedule = new();
 
-        // foreach (var stoVar in stopSchedule)
-        // {
-
-        // }
         List<string> Routes = stopSchedule.Keys.ToList();
         int CurrentHour = DateTime.Now.Hour;
         List<FilterSchedule> filterSchedules = new();
@@ -109,14 +98,6 @@ public class TimetableService
             List<string> MinutesBefore = new();
             List<string> MinutesCurrent = new();
             List<string> MinutesAfter = new();
-            // foreach (var b in stopSchedule[route])
-            // {
-
-            // if (CurrentHour - 1 >= 5) MinutesBefore = stopSchedule[route][Convert.ToString(CurrentHour - 1)];
-            // else if (CurrentHour - 1 == -1) MinutesBefore = stopSchedule[route][Convert.ToString(0)];
-
-            // if (CurrentHour - 1 == -1) MinutesBefore = stopSchedule[route][Convert.ToString(0)];
-            // else MinutesBefore = stopSchedule[route][Convert.ToString(CurrentHour - 1)];
 
             if (stopSchedule.TryGetValue(route, out var routeScheduleBefore) && routeScheduleBefore.TryGetValue(Convert.ToString((CurrentHour - 1 != -1) ? (CurrentHour - 1) : 23), out var departuresBefore))
             {
@@ -133,12 +114,6 @@ public class TimetableService
                 MinutesAfter = departuresAfter;
             }
 
-            // if (CurrentHour + 1 != 24) MinutesAfter = stopSchedule[route][Convert.ToString(CurrentHour + 1)];
-            // else if (CurrentHour + 1 == 24) MinutesAfter = stopSchedule[route][Convert.ToString(0)];
-
-            // if (CurrentHour + 1 == 24) MinutesAfter = stopSchedule[route][Convert.ToString(0)];
-            // else MinutesAfter = stopSchedule[route][Convert.ToString(CurrentHour + 1)];
-
             foreach (var i in MinutesBefore)
             {
                 var departure = TimeOnly.ParseExact(i, "HH:mm", System.Globalization.CultureInfo.InvariantCulture);
@@ -154,9 +129,8 @@ public class TimetableService
                 var departure = TimeOnly.ParseExact(i, "HH:mm", System.Globalization.CultureInfo.InvariantCulture);
                 filterSchedules.Add(new FilterSchedule { Hour = departure.Hour, Minute = departure.Minute, Route = route });
             }
-            // }
         }
-        // filterSchedules = filterSchedules.OrderBy(p => p.Hour).ThenBy(p => p.Minute).ToList();
+
         var TimeNow = TimeOnly.FromDateTime(DateTime.Now);
         List<DisplayType> finalScheduleBefore = new();
         List<DisplayType> finalScheduleNow = new();
@@ -168,15 +142,16 @@ public class TimetableService
         foreach (var item in filterSchedules)
         {
             string CurrentDest = DirectionIsBackward ? BackwardDest[item.Route] : ForwardDest[item.Route];
+
             TimeOnly time = new TimeOnly(item.Hour, item.Minute);
             var diff = TimeNow.ToTimeSpan() - time.ToTimeSpan();
-            // if (diff.TotalMinutes > 1000) diff -= TimeSpan.FromDays(1);
-            // else if (diff.TotalMinutes < -1000) diff += TimeSpan.FromDays(1);
+
             if (diff > TimeSpan.FromHours(12)) diff -= TimeSpan.FromDays(1);
             else if (diff < -TimeSpan.FromHours(12)) diff += TimeSpan.FromDays(1);
-            if (diff.TotalMinutes > 1 && diff.TotalMinutes <= 6) finalScheduleBefore.Add(new() { Number = item.Route, Destination = CurrentDest, Time = Convert.ToInt32(Math.Ceiling(diff.TotalMinutes)) });
+
+            if (diff.TotalMinutes > 1 && diff.TotalMinutes <= 6) finalScheduleBefore.Add(new() { Number = item.Route, Destination = CurrentDest, Time = Convert.ToInt32(Math.Round(diff.TotalMinutes)) });
             else if (diff.TotalMinutes > -1 && diff.TotalMinutes <= 1) finalScheduleNow.Add(new() { Number = item.Route, Destination = CurrentDest, Time = 0 });
-            else if (diff.TotalMinutes < 0 && diff.TotalMinutes >= -30) finalScheduleAfter.Add(new() { Number = item.Route, Destination = CurrentDest, Time = Convert.ToInt32(Math.Floor(-diff.TotalMinutes)) });
+            else if (diff.TotalMinutes < 0 && diff.TotalMinutes >= -30) finalScheduleAfter.Add(new() { Number = item.Route, Destination = CurrentDest, Time = Convert.ToInt32(Math.Round(-diff.TotalMinutes)) });
         }
 
         finalSchedule.Add(finalScheduleBefore.OrderByDescending(p => p.Time).ToList());

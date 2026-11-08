@@ -85,6 +85,3 @@ public partial class MainViewModel : ViewModelBase
         _ = ChangeTimetable();
     }
 }
-
-
-//xmlns:models="using:TimeTransport.Models"
