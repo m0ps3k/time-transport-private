@@ -44,12 +44,3 @@ public partial class App : Application
         base.OnFrameworkInitializationCompleted();
     }
 }
-
-// подгтовка релизных версий для windows и anroid
-
-// win:
-// dotnet publish TimeTransport.Desktop/TimeTransport.Desktop.csproj -c Release -r win-x64 --self-contained true -o artifacts/windows
-
-// anroid: первая - дебаг, вторая - релиз
-// dotnet build TimeTransport.Android/TimeTransport.Android.csproj -c Debug -p:AndroidPackageFormats=apk -p:AndroidSdkDirectory=/home/kk/Android/Sdk -p:JavaSdkDirectory=/home/kk/android-studio/jbr -o artifacts/android
-// dotnet publish TimeTransport.Android/TimeTransport.Android.csproj -c Release -f net10.0-android -p:AndroidPackageFormats=apk -p:AndroidKeyStore=false -p:AndroidSdkDirectory=/home/kk/Android/Sdk -p:JavaSdkDirectory=/home/kk/android-studio/jbr -o artifacts/android-release

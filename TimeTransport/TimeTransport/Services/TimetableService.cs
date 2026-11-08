@@ -40,12 +40,13 @@ public class TimetableService
         };
 
         string stopId = stopsDic[stop];
+        DateTime dateTimeNow = DateTime.Now;
         Dictionary<string, Dictionary<string, List<string>>> stopSchedule = new(); //Номер маршрута, Словарь: Часы: Лист из минут
-        DayOfWeek logical = DateTime.Now.AddHours(-3).DayOfWeek;
+        DayOfWeek logical = dateTimeNow.AddHours(-3).DayOfWeek;
         bool isWeekday = logical != DayOfWeek.Saturday && logical != DayOfWeek.Sunday;
 
 
-        if (stopId == "utkina_zavod")
+        if (!DirectionIsBackward)
         {
             foreach (var route in timetable.Routes)
             {
@@ -88,7 +89,7 @@ public class TimetableService
             }
         }
 
-        List<List<DisplayType>> finalSchedule = new();
+        
 
         List<string> Routes = stopSchedule.Keys.ToList();
         int CurrentHour = DateTime.Now.Hour;
@@ -100,19 +101,13 @@ public class TimetableService
             List<string> MinutesAfter = new();
 
             if (stopSchedule.TryGetValue(route, out var routeScheduleBefore) && routeScheduleBefore.TryGetValue(Convert.ToString((CurrentHour - 1 != -1) ? (CurrentHour - 1) : 23), out var departuresBefore))
-            {
                 MinutesBefore = departuresBefore;
-            }
 
             if (stopSchedule.TryGetValue(route, out var routeSchedule) && routeSchedule.TryGetValue(Convert.ToString(CurrentHour), out var departures))
-            {
                 MinutesCurrent = departures;
-            }
 
             if (stopSchedule.TryGetValue(route, out var routeScheduleAfter) && routeScheduleAfter.TryGetValue(Convert.ToString((CurrentHour + 1 != 24) ? (CurrentHour + 1) : 0), out var departuresAfter))
-            {
                 MinutesAfter = departuresAfter;
-            }
 
             foreach (var i in MinutesBefore)
             {
@@ -136,12 +131,15 @@ public class TimetableService
         List<DisplayType> finalScheduleNow = new();
         List<DisplayType> finalScheduleAfter = new();
 
-        Dictionary<string, string> ForwardDest = new() { ["119"] = "М. Ломоносовская", ["285"] = "Р. Оккервиль", ["4"] = "Р. Оккервиль" };
-        Dictionary<string, string> BackwardDest = new() { ["119"] = "Уткина заводь", ["285"] = "Уткина заводь", ["4"] = "Уткина заводь", ["8"] = "Уткина заводь, старое кольцо", ["476"] = "Пос. Им. Свердлова" };
+        Dictionary<string, string> dest;
+        if (DirectionIsBackward)
+            dest = new() { ["119"] = "Уткина заводь", ["285"] = "Уткина заводь", ["4"] = "Уткина заводь", ["8"] = "Уткина заводь, старое кольцо", ["476"] = "Пос. Им. Свердлова" };
+        else
+            dest = new() { ["119"] = "М. Ломоносовская", ["285"] = "Р. Оккервиль", ["4"] = "Р. Оккервиль" };
 
         foreach (var item in filterSchedules)
         {
-            string CurrentDest = DirectionIsBackward ? BackwardDest[item.Route] : ForwardDest[item.Route];
+            string CurrentDest = dest[item.Route];
 
             TimeOnly time = new TimeOnly(item.Hour, item.Minute);
             var diff = TimeNow.ToTimeSpan() - time.ToTimeSpan();
@@ -150,21 +148,15 @@ public class TimetableService
             else if (diff < -TimeSpan.FromHours(12)) diff += TimeSpan.FromDays(1);
 
             if (diff.TotalMinutes > 1 && diff.TotalMinutes <= 6) finalScheduleBefore.Add(new() { Number = item.Route, Destination = CurrentDest, Time = Convert.ToInt32(Math.Round(diff.TotalMinutes)) });
-            else if (diff.TotalMinutes > -1 && diff.TotalMinutes <= 1) finalScheduleNow.Add(new() { Number = item.Route, Destination = CurrentDest, Time = 0 });
+            else if (diff.TotalMinutes > 0 && diff.TotalMinutes <= 1) finalScheduleNow.Add(new() { Number = item.Route, Destination = CurrentDest, Time = 0 });
             else if (diff.TotalMinutes < 0 && diff.TotalMinutes >= -30) finalScheduleAfter.Add(new() { Number = item.Route, Destination = CurrentDest, Time = Convert.ToInt32(Math.Round(-diff.TotalMinutes)) });
         }
 
+        List<List<DisplayType>> finalSchedule = new();
         finalSchedule.Add(finalScheduleBefore.OrderByDescending(p => p.Time).ToList());
         finalSchedule.Add(finalScheduleNow);
         finalSchedule.Add(finalScheduleAfter.OrderBy(p => p.Time).ToList());
 
         return finalSchedule;
-    }
-
-    public class FilterSchedule
-    {
-        public int Hour { get; set; } = 0;
-        public int Minute { get; set; } = 0;
-        public string Route { get; set; } = "";
     }
 }

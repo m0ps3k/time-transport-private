@@ -45,5 +45,11 @@ public record DisplayType
     public string Number { get; set; } = "";
     public string Destination { get; set; } = "";
     public int Time { get; set; }
+}
 
+public class FilterSchedule
+{
+    public int Hour { get; set; } = 0;
+    public int Minute { get; set; } = 0;
+    public string Route { get; set; } = "";
 }
