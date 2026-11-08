@@ -452,3 +452,28 @@ $RECYCLE.BIN/
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
+
+# Local environment files (keep sanitized examples available)
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+
+# Private keys, certificates and Android signing stores
+*.jks
+*.keystore
+*.pem
+*.key
+*.p12
+*.snk
+id_rsa
+id_ed25519
+
+# Android build packages (publish through Releases)
+*.apk
+*.aab
+*.apks
+
+# Local Android SDK configuration
+local.properties
